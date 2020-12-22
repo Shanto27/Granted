@@ -1,0 +1,327 @@
+
+% This is a BPSK modulation-demodulation up-down conversion of the ofdm
+% signal coding where the data bits are transmitted to a singal subcarrier
+% and recover from the receiver side.
+
+clear all;
+close all;
+clc;
+
+
+%reliability bound
+avg_rel=99.99899;
+% the number of users to transmit the data
+%nstation=100;
+% we consider here number of packet duplication
+%dup=6;
+% initialize the number of transmit packet
+transmit=0;
+% set arrival rate
+%lambda array for hold arrival rate
+lambdaArray=[];
+a=15;
+%for selected channels array;
+channelArray=[];
+
+%reliability array
+reliabilityArray=[];
+
+original_bitstream=[];
+
+transmit_signal=[];
+%initially set total bit error
+totalError=0;
+% initially set all duplication packet error
+finalpacketerr=0;
+%initially set packet duplication  error
+packeterr=0;
+%receiver block activation flag
+receiver_activation=0;
+%initially set the number of received packet
+receivedPacket=0;
+
+stationArray=[];
+% total simulation time
+simulationTime=500;
+% per slot time .1  ms
+slottime=0.0002;
+%storing index per transmitted users
+user_array=[];
+% store the selected carrier for the user
+carrierFreq=[]; 
+%center frequency list
+fx=[3.4*10^9];
+%center frequency selected by individual packet
+carrierband=[];
+%duplication aray 
+dupArray=[];
+%arrival rate set for each users 
+iaarray=[]; 
+reliability=0;
+%lemda=2;
+%% initially set the interarrival rate of the total number of user
+% check for either the reliability is greater than the 99.999%
+nstation=90;
+% set maximmum channel
+special_flag=0;
+for dup=[3]
+reliability=0;  % reset the average reliability
+for lemda=[500]
+reliability=0;  % reset the average reliability
+increment=0;
+awakenode=randi([1,90]);
+z=zoneselection(awakenode);
+while (reliability <avg_rel)
+zdivider=7+increment; % increment the channel number
+increment=increment+dup;
+maxChannel=zdivider;
+iaarray(1:length(iaarray))=[]; % reset the iaarrival rate per execution
+receivedPacket=0; % reset for received packet for each time
+transmit=0;  % reset for transmit packet for each time
+biral=15;
+for o=1:1:15
+transmitTm= transmitTime(lemda,slottime);
+iaarray=[iaarray transmitTm];
+end
+minTime=min(iaarray);
+
+currentTime=minTime;
+%disp('arrival rate of transmitter');
+%disp(iaarray);
+%% the simulation run for the simulation time and each slot it checks either a data has to transmit or not
+
+while (currentTime < simulationTime)
+    carrierFreq(1:length(carrierFreq))=[]; % reset the carrier list array
+    carrierband(1:length(carrierband))=[]; % reset the carrier band
+      user_array(1:length(user_array))=[];    % reset the last users index value
+
+% now transmit data on selected slot by different users     
+for k=1:1:15
+    
+if (currentTime==iaarray(k)) % if slot matched
+    
+    user_array=[user_array k];
+    
+    % receiver activation flag on
+    receiver_activation=1;
+    special_flag=special_flag+1;
+    
+    
+    % number of transmit data stored
+    transmit=transmit+1;
+    % packet duplication starts
+    
+      zmax=zdivider*z;
+     if(z==0)
+         zmin=1;
+     else
+     zmin=zdivider*(z-1)+1;
+     end
+     f=0;
+    for d=1:1:dup   % count number of duplication
+    while(1)
+        fcheck=randi([zmin,zmax]); 
+        if (f~=fcheck)
+            f=fcheck;
+            break
+        else 
+            continue
+        end
+    end% random carrier selection
+    %random band selection
+  
+    pos = randi (length (fx));
+    fc = fx (pos);
+    %disp(fc);
+    carrierband=[carrierband fc];
+    carrierFreq=[carrierFreq f]; % preserve the carrier frequency list
+    fre=((f*10)*10^3); 
+    end
+    
+end
+%disp('frequency selection for the time');
+%disp(carrierFreq);
+end
+special_flag=0;
+%disp(carrierband);
+if(receiver_activation==1)
+    
+%%collision block for selecting frequency
+carrierLength=length(carrierFreq);
+% subcarrier frequency channel chcek block
+    for c=1:1:carrierLength
+        activeflag=0;
+    for g=1:1:carrierLength
+        if (c==g)
+            continue;
+        else
+          if (carrierFreq(c)==carrierFreq(g)&& carrierband(c)==carrierband(g))
+             if(activeflag==0)
+             packeterr=packeterr+1;
+             activeflag=activeflag+1;
+             
+             end
+          end  
+        end
+    end
+    if(rem(c,dup)==0)
+        
+        if (packeterr==dup)
+            finalpacketerr=finalpacketerr+1;
+        else
+            receivedPacket=receivedPacket+1;
+        end
+        packeterr=0;
+    end
+    end 
+
+%%update the inter-arrival rate array per transmission dynamically
+%if(length(carrierFreq)>1)
+%fid2=fopen('freqResult2.txt','at');
+%fprintf(fid2, ['$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$', '\n']);
+%fprintf(fid2, '%f\n', iaarray');
+%fclose(fid2);
+%end
+for mW=1:1:length(user_array)
+    
+transmitTm= transmitTime(lemda,slottime);
+%disp(transmitTm);
+iaarray(user_array(mW))=iaarray(user_array(mW))+transmitTm;
+minTime=min(iaarray);
+currentTime=minTime;
+end
+%disp('update arrival rate of transmitter');
+%disp(iaarray);
+ %receiver activation flag reset
+ receiver_activation=0;
+ disp(currentTime)
+end
+
+end
+disp('total number of packet transmitted');
+disp(transmit);
+disp('total number of packet received');
+disp(receivedPacket);
+disp('total number of packet error');
+disp(finalpacketerr);
+%disp('total number of ber over transmission');
+%disp(totalError);
+reliability=(receivedPacket/transmit)*100;
+disp(reliability);
+disp('channel');
+disp(maxChannel);
+disp(nstation);
+disp(dup);
+disp('zmax');
+disp(zmax);
+disp('zmin');
+disp(zmin);
+disp('Max channel');
+disp(zdivider);
+
+%disp(lemda);
+
+
+fid=fopen('trialResult.txt','at');
+fprintf(fid, ['----------------------', '\n']);
+fprintf(fid, ['Reliability', '\n']);
+fprintf(fid, '%f\n', reliability');
+fprintf(fid, ['maxChannel', '\n']);
+fprintf(fid, '%f \n', maxChannel');
+fprintf(fid, ['duplication', '\n']);
+fprintf(fid, '%f\n', dup');
+fprintf(fid, ['azmax', '\n']);
+fprintf(fid, '%f \n', zmax');
+fprintf(fid, ['zmin', '\n']);
+fprintf(fid, '%f \n', zmin');
+fprintf(fid, ['zone', '\n']);
+fprintf(fid, '%f \n', z');
+fprintf(fid, ['awakesensor', '\n']);
+fprintf(fid, '%f \n', awakenode');
+
+fprintf(fid, ['carrierLength', '\n']);
+fprintf(fid, '%f \n', carrierLength');
+
+fprintf(fid, ['fc', '\n']);
+fprintf(fid, '%f \n', fc');
+fprintf(fid, ['zmax', '\n']);
+fprintf(fid, '%f \n', zmax');
+fprintf(fid, ['zmin', '\n']);
+fprintf(fid, '%f \n', zmin');
+fprintf(fid, ['f', '\n']);
+fprintf(fid, '%f \n', f');
+
+fprintf(fid, ['finalpacketerr', '\n']);
+fprintf(fid, '%f \n', finalpacketerr');
+
+fprintf(fid, ['carrierband', '\n']);
+fprintf(fid, '%f \n', carrierband');
+fclose(fid);
+end
+
+dupArray=[dupArray dup];
+reliabilityArray=[reliabilityArray reliability];
+
+lambdaArray=[lambdaArray lemda];
+
+channelArray=[channelArray maxChannel];
+
+stationArray=[stationArray nstation];
+disp('Reliability');
+disp(reliabilityArray);
+disp('arrival rate');
+disp(lambdaArray);
+disp('number of channel');
+disp(channelArray);
+disp('number of transmitter');
+disp(stationArray);
+disp('duplication');
+disp(dupArray);
+fid1=fopen('successResult.txt','at');
+fprintf(fid1, ['----------------------', '\n']);
+fprintf(fid1, ['Reliability', '\n']);
+fprintf(fid1, '%f \n', reliabilityArray');
+fprintf(fid1, ['maxChannel', '\n']);
+fprintf(fid1, '%f \n', maxChannel');
+fprintf(fid1, ['arrival rate', '\n']);
+fprintf(fid1, '%f \n', lambdaArray');
+
+
+fclose(fid1);
+end
+end
+disp('Final result')
+disp('Reliability');
+disp(reliabilityArray);
+disp('arrival rate');
+disp(lambdaArray);
+disp('number of channel');
+disp(channelArray);
+disp('duplication');
+disp(dupArray);
+
+
+%% function for next transmission time generation
+
+function nextTransmissionTime = transmitTime(lemda,slottime)
+iarate=-((1/lemda)*log10(rand(1,1)));
+transmittime=slottime*ceil(iarate/slottime);
+nextTransmissionTime=transmittime;
+end
+
+function zone= zoneselection(awakenode)
+if(awakenode>0&&awakenode<=15)
+    zone=1;
+elseif(awakenode>15&&awakenode<=30)
+    zone=2;
+elseif(awakenode>30&&awakenode<=45)
+    zone=3;
+elseif(awakenode>45&&awakenode<=60)
+    zone=4;
+elseif(awakenode>60&&awakenode<=75)
+    zone=5;
+else
+    zone=6;
+end
+
+end
